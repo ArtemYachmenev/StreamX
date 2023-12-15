@@ -32,8 +32,12 @@ public class MainActivity extends AppCompatActivity  {
 
     //объявляем кнопки и прочее
     ImageButton capture, toggleFlash, flipCamera;
+    //предварительный просмотр камеры
     private PreviewView previewView;
+    //задняя камера
     int cameraFacing= CameraSelector.LENS_FACING_BACK;
+
+    //средство запуска результатов действия, запрашиваем разрешение, если результат тру то выбираем cameraFacing
     private final ActivityResultLauncher<String> activityResultLauncher=registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), new ActivityResultCallback<Boolean>() {
                 @Override
@@ -44,6 +48,8 @@ public class MainActivity extends AppCompatActivity  {
                 }
             }
     );
+
+    //создаем сцену
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,10 +60,12 @@ public class MainActivity extends AppCompatActivity  {
         toggleFlash=findViewById(R.id.toggleFlash);
         flipCamera=findViewById(R.id.flipCamera);
 
+        //если не разрешена камера, то выполняем  ActivityResultContrac из activityResultLauncher
         if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)!= PackageManager.PERMISSION_GRANTED){
             activityResultLauncher.launch(Manifest.permission.CAMERA);
         }
         else{
+            //запускаем камеру
             startCamera(cameraFacing);
         }
 
@@ -71,6 +79,7 @@ public class MainActivity extends AppCompatActivity  {
                 else {
                     cameraFacing=CameraSelector.LENS_FACING_BACK;
                 }
+                //запускаем камеру
                 startCamera(cameraFacing);
             }
         });
@@ -78,26 +87,37 @@ public class MainActivity extends AppCompatActivity  {
 
     //запуск камеры
     public void startCamera(int cameraFacing) {
+        //выбираем соотношение сторон
         int aspectRatio = aspectRatio(previewView.getWidth(), previewView.getHeight());
+        //интерфейс прослушивания будущего, которому передаем состояние камеры
         ListenableFuture<ProcessCameraProvider> listenableFuture = ProcessCameraProvider.getInstance(this);
 
+        //добавляем слушателя
         listenableFuture.addListener(() -> {
             try {
+                //получаем состояние?
                 ProcessCameraProvider cameraProvider = (ProcessCameraProvider) listenableFuture.get();
 
+                //получаем поток с камеры на экран с соотношением сторон
                 Preview preview = new Preview.Builder().setTargetAspectRatio(aspectRatio).build();
 
+                //устанавливаем режим захвата изображения,устанавливаем поворот
                 ImageCapture imageCapture = new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setTargetRotation(getWindowManager().getDefaultDisplay().getRotation()).build();
 
+                //выбираем камеру из cameraFacing
                 CameraSelector cameraSelector = new CameraSelector.Builder()
                         .requireLensFacing(cameraFacing).build();
 
+                //закрываем каждые открытые камеры
                 cameraProvider.unbindAll();
 
+                //Привязываем коллекцию вариантов использования к владельцу жизненного цикла
                 Camera camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
 
+                //устанавливаем слушатель
                 capture.setOnClickListener(new View.OnClickListener() {
+                    //если кнопка нажата то проверяем разрешение на запись
                     @Override
                     public void onClick(View view) {
                         if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -107,6 +127,7 @@ public class MainActivity extends AppCompatActivity  {
                     }
                 });
 
+                //слушатель вспышки
                 toggleFlash.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
@@ -114,17 +135,27 @@ public class MainActivity extends AppCompatActivity  {
                     }
                 });
 
+                //устанавливаем предворительный просмотр, путем получения предварительного просмотра из previewView
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
+
             } catch (ExecutionException | InterruptedException e) {
                 e.printStackTrace();
             }
         }, ContextCompat.getMainExecutor(this));
     }
 
+    //делаем фото
     public void takePicture(ImageCapture imageCapture) {
+        //путь в котором сохраняется фото
         final File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
+
+        //опции для сохранения снятого изображения, создаем параметры для захв. изображения в файл.
         ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
+
+        //делаем фото
         imageCapture.takePicture(outputFileOptions, Executors.newCachedThreadPool(), new ImageCapture.OnImageSavedCallback() {
+
+            //если фото сохранено делаем уведомление
             @Override
             public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
                 runOnUiThread(new Runnable() {
@@ -136,6 +167,7 @@ public class MainActivity extends AppCompatActivity  {
                 startCamera(cameraFacing);
             }
 
+            //если фото нет то выводим ошибку
             @Override
             public void onError(@NonNull ImageCaptureException exception) {
                 runOnUiThread(new Runnable() {
@@ -149,7 +181,9 @@ public class MainActivity extends AppCompatActivity  {
         });
     }
 
+    //устанавливаем иконку вспышки
     private void setFlashIcon(Camera camera) {
+        //если вспышка имеется
         if (camera.getCameraInfo().hasFlashUnit()) {
             if (camera.getCameraInfo().getTorchState().getValue() == 0) {
                 camera.getCameraControl().enableTorch(true);
@@ -159,6 +193,7 @@ public class MainActivity extends AppCompatActivity  {
                 toggleFlash.setImageResource(R.drawable.round_flash_on_24);
             }
         } else {
+            //если нет то пишем сообщение
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -168,6 +203,7 @@ public class MainActivity extends AppCompatActivity  {
         }
     }
 
+    //устанавливаем разрешение
     private int aspectRatio(int width, int height) {
         double previewRatio = (double) Math.max(width, height) / Math.min(width, height);
         if (Math.abs(previewRatio - 4.0 / 3.0) <= Math.abs(previewRatio - 16.0 / 9.0)) {
