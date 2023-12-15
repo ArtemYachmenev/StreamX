@@ -87,7 +87,7 @@ public class MainActivity extends AppCompatActivity  {
 
                 Preview preview = new Preview.Builder().setTargetAspectRatio(aspectRatio).build();
 
-                ImageCapture imageCapture = new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                ImageCapture imageCapture = new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setTargetRotation(getWindowManager().getDefaultDisplay().getRotation()).build();
 
                 CameraSelector cameraSelector = new CameraSelector.Builder()
