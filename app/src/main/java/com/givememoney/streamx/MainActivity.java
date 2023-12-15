@@ -77,31 +77,33 @@ public class MainActivity extends AppCompatActivity  {
     }
 
     //запуск камеры
-    public void startCamera(int cameraFacing){
-        int aspectRatio=aspectRatio(previewView.getWidth(), previewView.getHeight());
-        ListenableFuture<ProcessCameraProvider> listenableFuture=ProcessCameraProvider.getInstance(this);
+    public void startCamera(int cameraFacing) {
+        int aspectRatio = aspectRatio(previewView.getWidth(), previewView.getHeight());
+        ListenableFuture<ProcessCameraProvider> listenableFuture = ProcessCameraProvider.getInstance(this);
 
-        listenableFuture.addListener(()->{
+        listenableFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider=(ProcessCameraProvider) listenableFuture.get();
-                Preview preview=new Preview.Builder().setTargetRotation(aspectRatio).build();
-                //вместо CAPTURE_MODE_MINIMIZE_LATENCY поставил это
-                ImageCapture imageCapture=new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                ProcessCameraProvider cameraProvider = (ProcessCameraProvider) listenableFuture.get();
+
+                Preview preview = new Preview.Builder().setTargetAspectRatio(aspectRatio).build();
+
+                ImageCapture imageCapture = new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                         .setTargetRotation(getWindowManager().getDefaultDisplay().getRotation()).build();
-                CameraSelector cameraSelector=new CameraSelector.Builder().requireLensFacing(cameraFacing).build();
+
+                CameraSelector cameraSelector = new CameraSelector.Builder()
+                        .requireLensFacing(cameraFacing).build();
+
                 cameraProvider.unbindAll();
-                Camera camera= cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
+
+                Camera camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture);
 
                 capture.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        if (ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.WRITE_EXTERNAL_STORAGE)!=
-                                PackageManager.PERMISSION_GRANTED){
+                        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                             activityResultLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
                         }
-                        else{
-                            takePicture(imageCapture);
-                        }
+                        takePicture(imageCapture);
                     }
                 });
 
@@ -113,25 +115,22 @@ public class MainActivity extends AppCompatActivity  {
                 });
 
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
-
             } catch (ExecutionException | InterruptedException e) {
-                throw new RuntimeException(e);
+                e.printStackTrace();
             }
-        },ContextCompat.getMainExecutor(this));
-
-
+        }, ContextCompat.getMainExecutor(this));
     }
 
-    public void takePicture(ImageCapture imageCapture){
-        final File file=new File(getExternalFilesDir(null),System.currentTimeMillis()+".jpg");
-        ImageCapture.OutputFileOptions outputFileOptions=new ImageCapture.OutputFileOptions.Builder(file).build();
+    public void takePicture(ImageCapture imageCapture) {
+        final File file = new File(getExternalFilesDir(null), System.currentTimeMillis() + ".jpg");
+        ImageCapture.OutputFileOptions outputFileOptions = new ImageCapture.OutputFileOptions.Builder(file).build();
         imageCapture.takePicture(outputFileOptions, Executors.newCachedThreadPool(), new ImageCapture.OnImageSavedCallback() {
             @Override
             public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        Toast.makeText(MainActivity.this,"image saved at: ",Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Image saved at: " + file.getPath(), Toast.LENGTH_SHORT).show();
                     }
                 });
                 startCamera(cameraFacing);
@@ -139,15 +138,19 @@ public class MainActivity extends AppCompatActivity  {
 
             @Override
             public void onError(@NonNull ImageCaptureException exception) {
-                Toast.makeText(MainActivity.this,"filed to save: ",Toast.LENGTH_SHORT).show();
-
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MainActivity.this, "Failed to save: " + exception.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+                startCamera(cameraFacing);
             }
         });
-        startCamera(cameraFacing);
     }
 
     private void setFlashIcon(Camera camera) {
-        if (camera.getCameraInfo().getTorchState().getValue() == 0)
+        if (camera.getCameraInfo().hasFlashUnit()) {
             if (camera.getCameraInfo().getTorchState().getValue() == 0) {
                 camera.getCameraControl().enableTorch(true);
                 toggleFlash.setImageResource(R.drawable.round_flash_off_24);
@@ -155,23 +158,21 @@ public class MainActivity extends AppCompatActivity  {
                 camera.getCameraControl().enableTorch(false);
                 toggleFlash.setImageResource(R.drawable.round_flash_on_24);
             }
-        else {
+        } else {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Toast.makeText(MainActivity.this, "flash is not available currently", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Flash is not available currently", Toast.LENGTH_SHORT).show();
                 }
             });
-
         }
     }
 
     private int aspectRatio(int width, int height) {
-        double previewRatio=(double) Math.max(width, height)/ Math.min(width, height);
-        if (Math.abs(previewRatio-4.0/3.0)<=Math.abs(previewRatio-16.0/9.0)){
-        return AspectRatio.RATIO_4_3;
+        double previewRatio = (double) Math.max(width, height) / Math.min(width, height);
+        if (Math.abs(previewRatio - 4.0 / 3.0) <= Math.abs(previewRatio - 16.0 / 9.0)) {
+            return AspectRatio.RATIO_4_3;
         }
         return AspectRatio.RATIO_16_9;
     }
-
 }
